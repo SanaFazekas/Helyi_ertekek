@@ -31,7 +31,6 @@
             overflow: hidden;
         }
 
-        /* Sidebar Settings */
         .sidebar {
             width: 380px;
             background: var(--panel-bg);
@@ -71,14 +70,6 @@
             border: 1px solid var(--border);
             font-size: 0.9rem;
             width: 100%;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.88rem;
-            margin-top: 4px;
         }
 
         .mode-toggle {
@@ -126,8 +117,8 @@
         .btn-success { background: var(--success); }
         .btn-danger { background: var(--danger); }
         .btn-dark { background: var(--text-color); }
+        .btn-navy { background: #1B4F72; }
 
-        /* Main Content */
         .main-content {
             flex-grow: 1;
             padding: 20px 30px;
@@ -152,7 +143,6 @@
             color: var(--primary);
         }
 
-        /* Summary Banner */
         .summary-banner {
             background: #EBF5FB;
             border: 2px solid var(--primary);
@@ -170,7 +160,6 @@
             font-size: 1.2rem;
         }
 
-        /* Task List Layout */
         .tasks-container {
             display: flex;
             flex-direction: column;
@@ -207,7 +196,6 @@
             font-weight: bold;
         }
 
-        /* Step-by-step solution breakdown box */
         .solution-breakdown {
             background-color: #FDEDEC;
             border-left: 4px solid var(--danger);
@@ -225,7 +213,6 @@
             color: var(--danger);
         }
 
-        /* Group / Projection Mode (2x font) */
         .group-mode .task-card {
             font-size: 1.9rem;
             padding: 22px 26px;
@@ -236,9 +223,8 @@
             font-size: 1.7rem;
         }
 
-        /* Statistics Table */
         .stats-wrapper {
-            max-height: 150px;
+            max-height: 180px;
             overflow-y: auto;
             border: 1px solid var(--border);
             border-radius: 4px;
@@ -264,7 +250,6 @@
             top: 0;
         }
 
-        /* Print formatting for PDF download */
         @media print {
             .sidebar, .header-bar button, .summary-banner, #submit-container, .solution-breakdown {
                 display: none !important;
@@ -282,15 +267,19 @@
                 box-shadow: none;
             }
             .task-input {
-                border: none;
+                display: none !important;
+            }
+            .print-hidden-line {
                 border-bottom: 1px solid #000;
+                display: inline-block;
+                width: 150px;
+                height: 20px;
             }
         }
     </style>
 </head>
 <body>
 
-    <!-- SIDEBAR / BEÁLLÍTÁSOK -->
     <div class="sidebar">
         <h2>⚙️ Beállítások</h2>
 
@@ -326,21 +315,18 @@
             </select>
         </div>
 
-        <div class="checkbox-group">
-            <input type="checkbox" id="adaptive-toggle">
-            <label for="adaptive-toggle">Adaptív nehezedés 🚀</label>
-        </div>
-
         <div class="form-group" style="margin-top: 5px;">
             <label for="count-select">Feladatok száma:</label>
             <select id="count-select" onchange="generateNewSeries()">
-                <option value="5">5 feladat</option>
+                <option value="6">6 feladat</option>
                 <option value="10" selected>10 feladat</option>
                 <option value="15">15 feladat</option>
+                <option value="20">20 feladat</option>
             </select>
         </div>
 
         <button class="btn btn-success" onclick="generateNewSeries()">Új feladatsor 🔄</button>
+        <button class="btn btn-navy" onclick="downloadPDF()">Feladatsor nyomtatása 📄</button>
 
         <div style="margin-top: 10px;">
             <h2>📊 Statisztika</h2>
@@ -352,19 +338,19 @@
                             <th>Szint</th>
                             <th>Pont</th>
                             <th>%</th>
+                            <th>Osztályzat</th>
                         </tr>
                     </thead>
                     <tbody id="stats-tbody"></tbody>
                 </table>
             </div>
             <div style="display: flex; gap: 5px; margin-top: 8px;">
-                <button class="btn btn-dark" style="flex: 1;" onclick="downloadPDF()">Letöltés PDF-ben 📄</button>
+                <button class="btn btn-dark" style="flex: 1;" onclick="saveCurrentStatManually()">Mentés 💾</button>
                 <button class="btn btn-danger" style="flex: 1;" onclick="clearStats()">Törlés 🗑️</button>
             </div>
         </div>
     </div>
 
-    <!-- MAIN CONTENT AREA -->
     <div class="main-content" id="main-content-area">
         <div class="header-bar">
             <div class="app-title">A számok helyi értéke</div>
@@ -376,9 +362,8 @@
             <div id="summary-details" style="font-weight: 600;"></div>
         </div>
 
-        <!-- 3. szint esetén megjelenő egyszeri minta a címsor alatt -->
         <div id="level3-notice" style="background: #E8F8F5; border: 1px solid var(--success); padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 0.95rem; color: #145A32; display: none;">
-            💡 <strong>Minta a 3. szinthez:</strong> 2104 felbontása így néz ki: <strong>2·1000 + 1·100 + 0·10 + 4·1</strong> (szóközök nélkül vagy szóközökkel is beírhatod).
+            💡 <strong>Minta a 3. szinthez:</strong> 2104 felbontása így néz ki: <strong>2·1000 + 1·100 + 0·10 + 4·1</strong> (szóközökkel, csillaggal vagy ponttal is beírhatod).
         </div>
 
         <div id="tasks-wrapper" class="tasks-container"></div>
@@ -454,36 +439,43 @@ function generateNewSeries() {
     const count = parseInt(document.getElementById('count-select').value);
     const level = document.getElementById('level-select').value;
     const domain = document.getElementById('domain-select').value;
-    const isAdaptive = document.getElementById('adaptive-toggle').checked;
 
     generatedTasks = [];
     answerKeyVisible = false;
     document.getElementById('summary-banner').style.display = 'none';
-
     document.getElementById('level3-notice').style.display = (level === '3') ? 'block' : 'none';
 
-    let currentDomain = domain;
-    let domainsList = ['thousand', 'tenthousand', 'hundredthousand', 'million'];
+    let level1Indices = [];
+    if (level === '1') {
+        let maxPerType = Math.floor(count / 3);
+        let availablePvIndices = [0, 1, 2, 3, 4, 5, 6];
+        let countsMap = {};
+        
+        for (let i = 0; i < count; i++) {
+            let validIdxs = availablePvIndices.filter(idx => (countsMap[idx] || 0) < maxPerType);
+            if (validIdxs.length === 0) validIdxs = availablePvIndices;
+            let chosenIdx = validIdxs[Math.floor(Math.random() * validIdxs.length)];
+            countsMap[chosenIdx] = (countsMap[chosenIdx] || 0) + 1;
+            level1Indices.push(chosenIdx);
+        }
+    }
 
     for (let i = 0; i < count; i++) {
-        if (isAdaptive) {
-            let idx = Math.min(Math.floor((i / count) * domainsList.length), domainsList.length - 1);
-            currentDomain = domainsList[idx];
-        }
-        let num = generateNumber(currentDomain);
-        generatedTasks.push(createTask(level, num));
+        let num = generateNumber(domain);
+        let forcedPvIdx = (level === '1') ? level1Indices[i] : null;
+        generatedTasks.push(createTask(level, num, forcedPvIdx));
     }
 
     renderTasks();
 }
 
-function createTask(level, number) {
+function createTask(level, number, forcedPvIdx) {
     let strNum = String(number);
     let len = strNum.length;
     let activePv = placeValues.slice(0, len);
 
     if (level === '1') {
-        let targetPv = activePv[Math.floor(Math.random() * activePv.length)];
+        let targetPv = activePv[forcedPvIdx] || activePv[Math.floor(Math.random() * activePv.length)];
         let digit = parseInt(strNum[strNum.length - 1 - activePv.indexOf(targetPv)]);
 
         return {
@@ -507,24 +499,24 @@ function createTask(level, number) {
             number: number,
             correctAnswer: number,
             questionText: `Írd fel számmal: <strong>${partsText.join(', ')}</strong>`,
-            explanation: `Az egyes, tízes, százas stb. értékeket összeadva a kapott szám: ${number.toLocaleString()}. (Figyelj a hiányzó helyiértékekre, oda 0-t kell írni!)`
+            explanation: `A helyes szám: ${number.toLocaleString()}. (A hiányzó helyiértékek helyére 0-t kellett írni.)`
         };
     } else {
         let terms = [];
         for (let i = 0; i < len; i++) {
             let digit = parseInt(strNum[i]);
             let pvVal = Math.pow(10, len - 1 - i);
-            terms.push(`${digit}·${pvVal}`);
+            terms.push(`${digit}*${pvVal}`);
         }
 
-        let displayExpr = terms.join('+');
+        let canonical = terms.join('+');
 
         return {
             level: '3',
             number: number,
-            correctAnswer: displayExpr.replace(/\s+/g, ''),
+            correctAnswer: canonical,
             questionText: `Add meg a(z) <strong>${number.toLocaleString()}</strong> szám teljes felbontását:`,
-            explanation: `A helyiértékek szerinti felbontás során minden számjegyet meg kell szorozni a hozzá tartozó helyiértékkel (pl. 1000, 100, 10, 1), és ezeket össze kell adni: ${displayExpr}.`
+            explanation: `A helyes teljes felbontás: ${canonical.replace(/\*/g, '·')}.`
         };
     }
 }
@@ -541,10 +533,13 @@ function renderTasks() {
         card.className = 'task-card';
 
         let inputOrSolution = '';
-        let displayAns = task.level === '3' ? task.correctAnswer : task.correctAnswer.toLocaleString();
+        let displayAns = task.level === '3' ? task.correctAnswer.replace(/\*/g, '·') : task.correctAnswer.toLocaleString();
 
         if (currentMode === 'individual') {
-            inputOrSolution = `<input type="text" class="task-input" id="ans-${idx}" placeholder="válasz">`;
+            inputOrSolution = `
+                <input type="text" class="task-input" id="ans-${idx}" placeholder="válasz">
+                <span class="print-hidden-line" style="display:none;"></span>
+            `;
         } else {
             inputOrSolution = `<span class="group-solution" id="sol-${idx}" style="visibility: ${answerKeyVisible ? 'visible' : 'hidden'}; color: var(--success); font-weight: bold;">= ${displayAns}</span>`;
         }
@@ -555,8 +550,8 @@ function renderTasks() {
                 ${inputOrSolution}
             </div>
             <div class="solution-breakdown" id="breakdown-${idx}">
-                <strong>Levezetés / Magyarázat:</strong>
-                <div>${task.explanation}</div>
+                <strong>Helyes eredmény:</strong>
+                <div>${displayAns}</div>
             </div>
         `;
         wrapper.appendChild(card);
@@ -571,53 +566,114 @@ function toggleAnswerKey() {
     });
 }
 
+function normalizeLevel3(str) {
+    if (!str) return '';
+    let cleaned = str.replace(/\s+/g, '').replace(/[·*×]/g, '*').toLowerCase();
+    let parts = cleaned.split('+');
+    let parsedTerms = parts.map(p => {
+        let sub = p.split('*');
+        if (sub.length === 2) {
+            let n1 = parseInt(sub[0]) || 0;
+            let n2 = parseInt(sub[1]) || 0;
+            return n1 * n2;
+        }
+        return parseInt(p) || 0;
+    });
+    let totalSum = parsedTerms.reduce((a, b) => a + b, 0);
+    return totalSum;
+}
+
 function checkAnswers() {
     let correct = 0;
+    let detailsList = [];
+
     generatedTasks.forEach((task, idx) => {
         const input = document.getElementById(`ans-${idx}`);
         const breakdownBox = document.getElementById(`breakdown-${idx}`);
         if (!input) return;
 
-        let userVal = input.value.trim().replace(/\s+/g, '').toLowerCase();
-        let targetVal = String(task.correctAnswer).toLowerCase();
+        let userValStr = input.value.trim();
+        let isCorrect = false;
 
-        if (userVal === targetVal) {
+        if (task.level === '3') {
+            let userSum = normalizeLevel3(userValStr);
+            let targetSum = normalizeLevel3(task.correctAnswer);
+            if (userSum === targetSum && userSum > 0) {
+                isCorrect = true;
+            }
+        } else {
+            let userVal = userValStr.replace(/\s+/g, '').toLowerCase();
+            let targetVal = String(task.correctAnswer).toLowerCase();
+            if (userVal === targetVal) {
+                isCorrect = true;
+            }
+        }
+
+        if (isCorrect) {
             correct++;
             input.style.borderColor = 'var(--success)';
             input.style.backgroundColor = '#E8F8F5';
             if (breakdownBox) breakdownBox.style.display = 'none';
+            detailsList.push(`${task.number} -> ${userValStr || '(üres)'} (Ok)`);
         } else {
             input.style.borderColor = 'var(--danger)';
             input.style.backgroundColor = '#FDEDEC';
             if (breakdownBox) breakdownBox.style.display = 'flex';
+            detailsList.push(`${task.number} -> ${userValStr || '(üres)'} (X)`);
         }
     });
 
     const total = generatedTasks.length;
     const name = document.getElementById('student-name').value.trim() || 'Tanuló';
     const percent = Math.round((correct / total) * 100);
+    const grade = calculateGrade(percent);
 
     const banner = document.getElementById('summary-banner');
     document.getElementById('summary-title').innerText = `Eredményértékelés - ${name}`;
-    document.getElementById('summary-details').innerHTML = `Pontszám: ${correct} / ${total} (${percent}%)`;
+    document.getElementById('summary-details').innerHTML = `Pontszám: ${correct} / ${total} (${percent}%) — Osztályzat: ${grade}`;
     banner.style.display = 'flex';
 
     document.getElementById('main-content-area').scrollTop = 0;
 
     let levelMap = { '1': '1. szint', '2': '2. szint', '3': '3. szint' };
     let levelName = levelMap[document.getElementById('level-select').value];
-    saveStat(name, levelName, `${correct}/${total}`, `${percent}%`);
+    
+    window.lastResultData = {
+        name: name,
+        level: levelName,
+        score: `${correct}/${total}`,
+        percent: `${percent}%`,
+        grade: grade,
+        details: detailsList.join(', ')
+    };
 }
 
-function saveStat(name, level, score, percent) {
-    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v3') || '[]');
-    stats.push({ name: name, level: level, score: score, percent: percent });
-    localStorage.setItem('math_helyiertek_stats_v3', JSON.stringify(stats));
+function calculateGrade(percent) {
+    if (percent >= 90) return '1';
+    if (percent >= 75) return '2';
+    if (percent >= 50) return '3';
+    if (percent >= 25) return '4';
+    return '5';
+}
+
+function saveCurrentStatManually() {
+    if (!window.lastResultData) {
+        alert('Előbb végezz el egy ellenőrzést, hogy legyen mit menteni!');
+        return;
+    }
+    saveStatRecord(window.lastResultData);
+    alert('Eredmény sikeresen mentve a statisztikába!');
+}
+
+function saveStatRecord(data) {
+    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v4') || '[]');
+    stats.push(data);
+    localStorage.setItem('math_helyiertek_stats_v4', JSON.stringify(stats));
     renderStats();
 }
 
 function renderStats() {
-    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v3') || '[]');
+    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v4') || '[]');
     const tbody = document.getElementById('stats-tbody');
     tbody.innerHTML = '';
     stats.forEach(s => {
@@ -627,6 +683,12 @@ function renderStats() {
                 <td>${s.level}</td>
                 <td><strong>${s.score}</strong></td>
                 <td><strong>${s.percent}</strong></td>
+                <td><strong>${s.grade}</strong></td>
+            </tr>
+            <tr>
+                <td colspan="5" style="text-align: left; font-size: 0.7rem; color: #555; background: #f9f9f9; padding: 3px 6px;">
+                    Részletek: ${s.details || 'Nincs adat'}
+                </td>
             </tr>
         `;
     });
@@ -634,17 +696,12 @@ function renderStats() {
 
 function clearStats() {
     if (confirm('Biztosan törölni szeretnéd a statisztikát?')) {
-        localStorage.removeItem('math_helyiertek_stats_v3');
+        localStorage.removeItem('math_helyiertek_stats_v4');
         renderStats();
     }
 }
 
 function downloadPDF() {
-    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v3') || '[]');
-    if (stats.length === 0) {
-        alert('Nincs mentett statisztika a letöltéshez!');
-        return;
-    }
     window.print();
 }
 
