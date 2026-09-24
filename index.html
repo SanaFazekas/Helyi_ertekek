@@ -250,8 +250,35 @@
             top: 0;
         }
 
+        .virtual-keypad {
+            display: none;
+            gap: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            background: #E8F8F5;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--success);
+        }
+
+        .keypad-btn {
+            background: white;
+            color: #145A32;
+            border: 1px solid var(--success);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .keypad-btn:hover {
+            background: #E8F8F5;
+            opacity: 0.8;
+        }
+
         @media print {
-            .sidebar, .header-bar button, .summary-banner, #submit-container, .solution-breakdown {
+            .sidebar, .header-bar button, .summary-banner, #submit-container, .solution-breakdown, .virtual-keypad {
                 display: none !important;
             }
             body {
@@ -330,7 +357,7 @@
 
         <div style="margin-top: 10px;">
             <h2>📊 Statisztika</h2>
-            <div class="stats-wrapper">
+            <div class="stats-wrapper" id="stats-container-print">
                 <table>
                     <thead>
                         <tr>
@@ -345,7 +372,7 @@
                 </table>
             </div>
             <div style="display: flex; gap: 5px; margin-top: 8px;">
-                <button class="btn btn-dark" style="flex: 1;" onclick="saveCurrentStatManually()">Mentés 💾</button>
+                <button class="btn btn-dark" style="flex: 1;" onclick="downloadStatsPDF()">Mentés PDF-be 📄</button>
                 <button class="btn btn-danger" style="flex: 1;" onclick="clearStats()">Törlés 🗑️</button>
             </div>
         </div>
@@ -362,8 +389,21 @@
             <div id="summary-details" style="font-weight: 600;"></div>
         </div>
 
-        <div id="level3-notice" style="background: #E8F8F5; border: 1px solid var(--success); padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 0.95rem; color: #145A32; display: none;">
-            💡 <strong>Minta a 3. szinthez:</strong> 2104 felbontása így néz ki: <strong>2·1000 + 1·100 + 0·10 + 4·1</strong> (szóközökkel, csillaggal vagy ponttal is beírhatod).
+        <div id="level3-notice" style="background: #E8F8F5; border: 1px solid var(--success); padding: 10px 15px; border-radius: 6px; margin-bottom: 10px; font-size: 0.95rem; color: #145A32; display: none;">
+            💡 <strong>Minta a 3. szinthez:</strong> 2104 felbontása így néz ki: <strong>2·1000 + 1·100 + 0·10 + 4·1</strong> (használhatod a gombokat vagy közvetlenül is beírhatod).
+        </div>
+
+        <!-- Virtuális billentyűzet a 3. szinthez -->
+        <div id="virtual-keypad" class="virtual-keypad">
+            <span style="font-size: 0.85rem; font-weight: bold; width: 100%; color: #145A32;">Segédgombok a felbontáshoz:</span>
+            <button class="keypad-btn" onclick="insertSymbol('100000')">100 000</button>
+            <button class="keypad-btn" onclick="insertSymbol('10000')">10 000</button>
+            <button class="keypad-btn" onclick="insertSymbol('1000')">1000</button>
+            <button class="keypad-btn" onclick="insertSymbol('100')">100</button>
+            <button class="keypad-btn" onclick="insertSymbol('10')">10</button>
+            <button class="keypad-btn" onclick="insertSymbol('1')">1</button>
+            <button class="keypad-btn" onclick="insertSymbol('·')">·</button>
+            <button class="keypad-btn" onclick="insertSymbol('+')">+</button>
         </div>
 
         <div id="tasks-wrapper" class="tasks-container"></div>
@@ -378,6 +418,7 @@
 let currentMode = 'individual';
 let generatedTasks = [];
 let answerKeyVisible = false;
+let lastFocusedInput = null;
 
 const placeValues = [
     { name: 'egyeses', label: 'egyesek', singular: 'egyes', val: 1 },
@@ -443,7 +484,10 @@ function generateNewSeries() {
     generatedTasks = [];
     answerKeyVisible = false;
     document.getElementById('summary-banner').style.display = 'none';
-    document.getElementById('level3-notice').style.display = (level === '3') ? 'block' : 'none';
+    
+    const isLevel3 = (level === '3');
+    document.getElementById('level3-notice').style.display = isLevel3 ? 'block' : 'none';
+    document.getElementById('virtual-keypad').style.display = isLevel3 ? 'flex' : 'none';
 
     let level1Indices = [];
     if (level === '1') {
@@ -537,7 +581,7 @@ function renderTasks() {
 
         if (currentMode === 'individual') {
             inputOrSolution = `
-                <input type="text" class="task-input" id="ans-${idx}" placeholder="válasz">
+                <input type="text" class="task-input" id="ans-${idx}" placeholder="válasz" onfocus="lastFocusedInput = this">
                 <span class="print-hidden-line" style="display:none;"></span>
             `;
         } else {
@@ -556,6 +600,25 @@ function renderTasks() {
         `;
         wrapper.appendChild(card);
     });
+
+    // Beállítjuk az első inputot alapértelmezettként, ha létezik
+    const firstInput = document.getElementById('ans-0');
+    if (firstInput) lastFocusedInput = firstInput;
+}
+
+function insertSymbol(symbol) {
+    if (!lastFocusedInput) {
+        // Ha nincs fókuszban semmi, próbáljuk meg az első beviteli mezőt keresni
+        lastFocusedInput = document.querySelector('.task-input');
+    }
+    if (lastFocusedInput) {
+        let start = lastFocusedInput.selectionStart;
+        let end = lastFocusedInput.selectionEnd;
+        let val = lastFocusedInput.value;
+        lastFocusedInput.value = val.substring(0, start) + symbol + val.substring(end);
+        lastFocusedInput.focus();
+        lastFocusedInput.selectionStart = lastFocusedInput.selectionEnd = start + symbol.length;
+    }
 }
 
 function toggleAnswerKey() {
@@ -638,7 +701,8 @@ function checkAnswers() {
     let levelMap = { '1': '1. szint', '2': '2. szint', '3': '3. szint' };
     let levelName = levelMap[document.getElementById('level-select').value];
     
-    window.lastResultData = {
+    // Automatikus statisztika mentés
+    let statRecord = {
         name: name,
         level: levelName,
         score: `${correct}/${total}`,
@@ -646,6 +710,7 @@ function checkAnswers() {
         grade: grade,
         details: detailsList.join(', ')
     };
+    saveStatRecord(statRecord);
 }
 
 function calculateGrade(percent) {
@@ -656,24 +721,15 @@ function calculateGrade(percent) {
     return '5';
 }
 
-function saveCurrentStatManually() {
-    if (!window.lastResultData) {
-        alert('Előbb végezz el egy ellenőrzést, hogy legyen mit menteni!');
-        return;
-    }
-    saveStatRecord(window.lastResultData);
-    alert('Eredmény sikeresen mentve a statisztikába!');
-}
-
 function saveStatRecord(data) {
-    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v4') || '[]');
+    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v5') || '[]');
     stats.push(data);
-    localStorage.setItem('math_helyiertek_stats_v4', JSON.stringify(stats));
+    localStorage.setItem('math_helyiertek_stats_v5', JSON.stringify(stats));
     renderStats();
 }
 
 function renderStats() {
-    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v4') || '[]');
+    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v5') || '[]');
     const tbody = document.getElementById('stats-tbody');
     tbody.innerHTML = '';
     stats.forEach(s => {
@@ -696,13 +752,83 @@ function renderStats() {
 
 function clearStats() {
     if (confirm('Biztosan törölni szeretnéd a statisztikát?')) {
-        localStorage.removeItem('math_helyiertek_stats_v4');
+        localStorage.removeItem('math_helyiertek_stats_v5');
         renderStats();
     }
 }
 
 function downloadPDF() {
     window.print();
+}
+
+function downloadStatsPDF() {
+    let stats = JSON.parse(localStorage.getItem('math_helyiertek_stats_v5') || '[]');
+    if (stats.length === 0) {
+        alert('Nincs mentett statisztika a letöltéshez!');
+        return;
+    }
+
+    let printWindow = window.open('', '_blank');
+    let htmlContent = `
+        <!DOCTYPE html>
+        <html lang="hu">
+        <head>
+            <meta charset="UTF-8">
+            <title>Statisztika - A számok helyi értéke</title>
+            <style>
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #2C3E50; }
+                h2 { color: #2980B9; border-bottom: 2px solid #3498DB; padding-bottom: 5px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; text-align: center; }
+                th, td { padding: 8px; border: 1px solid #BDC3C7; }
+                th { background-color: #2980B9; color: white; }
+                td { text-align: left; }
+                td:nth-child(1), td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) { text-align: center; }
+            </style>
+        </head>
+        <body>
+            <h2>📊 Tanulói Statisztika - A számok helyi értéke</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Név</th>
+                        <th>Szint</th>
+                        <th>Pont</th>
+                        <th>%</th>
+                        <th>Osztályzat</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    stats.forEach(s => {
+        htmlContent += `
+            <tr>
+                <td>${s.name}</td>
+                <td>${s.level}</td>
+                <td><strong>${s.score}</strong></td>
+                <td><strong>${s.percent}</strong></td>
+                <td><strong>${s.grade}</strong></td>
+            </tr>
+            <tr>
+                <td colspan="5" style="font-size: 0.8rem; color: #555; background: #f9f9f9;">
+                    Részletek: ${s.details || 'Nincs adat'}
+                </td>
+            </tr>
+        `;
+    });
+
+    htmlContent += `
+                </tbody>
+            </table>
+            <script>
+                window.onload = function() { window.print(); window.close(); }
+            <\/script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
 }
 
 window.onload = () => {
